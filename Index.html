@@ -1,0 +1,924 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Double Tap Runner</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: system-ui, sans-serif;
+    background: #080b14;
+    color: white;
+    overflow: hidden;
+    touch-action: manipulation;
+}
+
+#game {
+    width: 100vw;
+    height: 100dvh;
+    position: relative;
+    background: linear-gradient(180deg, #111827, #080b14);
+    overflow: hidden;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* HUD */
+
+.hud {
+    position: absolute;
+    top: 25px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.score-box {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    padding: 12px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.score-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #94a3b8;
+}
+
+.score {
+    font-size: 26px;
+    font-weight: 800;
+}
+
+.speed-box {
+    color: #94a3b8;
+    font-size: 12px;
+    text-align: right;
+}
+
+.speed-box span {
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
+}
+
+/* Screens */
+
+.screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 25px;
+    background: rgba(5,8,16,0.8);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.title {
+    font-size: clamp(35px, 9vw, 60px);
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    letter-spacing: -2px;
+}
+
+.title span {
+    color: #38bdf8;
+}
+
+.subtitle {
+    margin-top: 14px;
+    color: #94a3b8;
+    text-align: center;
+    font-size: 14px;
+}
+
+.characters {
+    display: flex;
+    gap: 18px;
+    margin: 45px 0 35px;
+}
+
+.character {
+    width: 85px;
+    height: 110px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: 0.2s;
+    cursor: pointer;
+}
+
+.character.selected {
+    border-color: white;
+    background: rgba(255,255,255,0.12);
+    transform: translateY(-5px);
+}
+
+.character-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 10px;
+    position: relative;
+    box-shadow: 0 0 25px currentColor;
+}
+
+.blue {
+    background: #38bdf8;
+    color: #38bdf8;
+}
+
+.yellow {
+    background: #facc15;
+    color: #facc15;
+}
+
+.red {
+    background: #fb4b4b;
+    color: #fb4b4b;
+}
+
+.avatar::before,
+.avatar::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #101827;
+}
+
+.avatar::before {
+    left: 8px;
+}
+
+.avatar::after {
+    right: 8px;
+}
+
+button {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 800;
+}
+
+.main-btn {
+    width: 220px;
+    padding: 17px;
+    border-radius: 16px;
+    background: white;
+    color: #080b14;
+    font-size: 15px;
+    letter-spacing: 1px;
+    transition: transform 0.15s;
+}
+
+.main-btn:active {
+    transform: scale(0.95);
+}
+
+.hint {
+    margin-top: 25px;
+    color: #64748b;
+    font-size: 12px;
+    text-align: center;
+    line-height: 1.8;
+}
+
+.game-over-title {
+    font-size: 48px;
+    font-weight: 900;
+    color: #fb4b4b;
+}
+
+.final-score {
+    margin: 20px 0 30px;
+    font-size: 22px;
+    color: #94a3b8;
+}
+
+.final-score span {
+    color: white;
+    font-size: 40px;
+    font-weight: 900;
+}
+
+@media (max-height: 600px) {
+    .characters {
+        margin: 20px 0;
+    }
+
+    .character {
+        height: 85px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+
+<canvas id="canvas"></canvas>
+
+<div class="hud hidden" id="hud">
+    <div class="score-box">
+        <div class="score-label">SCORE</div>
+        <div class="score" id="score">0</div>
+    </div>
+
+    <div class="speed-box">
+        SPEED<br>
+        <span id="speed">1.0x</span>
+    </div>
+</div>
+
+<!-- START SCREEN -->
+
+<div class="screen" id="startScreen">
+
+    <div class="title">
+        DOUBLE<br><span>TAP</span>
+    </div>
+
+    <div class="subtitle">
+        How long can you survive?
+    </div>
+
+    <div class="characters">
+
+        <div class="character selected" data-color="blue">
+            <div class="avatar blue"></div>
+            <div class="character-name">BLUE</div>
+        </div>
+
+        <div class="character" data-color="yellow">
+            <div class="avatar yellow"></div>
+            <div class="character-name">YELLOW</div>
+        </div>
+
+        <div class="character" data-color="red">
+            <div class="avatar red"></div>
+            <div class="character-name">RED</div>
+        </div>
+
+    </div>
+
+    <button class="main-btn" id="startBtn">
+        START RUNNING
+    </button>
+
+    <div class="hint">
+        TAP TO JUMP<br>
+        TAP AGAIN IN AIR FOR DOUBLE JUMP
+    </div>
+
+</div>
+
+<!-- GAME OVER SCREEN -->
+
+<div class="screen hidden" id="gameOverScreen">
+
+    <div class="game-over-title">GAME OVER</div>
+
+    <div class="final-score">
+        SCORE<br>
+        <span id="finalScore">0</span>
+    </div>
+
+    <button class="main-btn" id="restartBtn">
+        PLAY AGAIN
+    </button>
+
+    <div class="hint">
+        TRY TO BEAT YOUR HIGH SCORE
+    </div>
+
+</div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOverScreen");
+const hud = document.getElementById("hud");
+
+const scoreDisplay = document.getElementById("score");
+const speedDisplay = document.getElementById("speed");
+
+let width, height, ground;
+
+function resize() {
+    width = canvas.width = window.innerWidth * devicePixelRatio;
+    height = canvas.height = window.innerHeight * devicePixelRatio;
+
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+
+    width = window.innerWidth;
+    height = window.innerHeight;
+
+    ground = height * 0.78;
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+/* CHARACTER */
+
+const colors = {
+    blue: "#38bdf8",
+    yellow: "#facc15",
+    red: "#fb4b4b"
+};
+
+let selectedColor = "blue";
+
+document.querySelectorAll(".character").forEach(character => {
+    character.addEventListener("click", () => {
+
+        document.querySelectorAll(".character").forEach(c => {
+            c.classList.remove("selected");
+        });
+
+        character.classList.add("selected");
+
+        selectedColor = character.dataset.color;
+    });
+});
+
+/* GAME VARIABLES */
+
+let player;
+let obstacles = [];
+let particles = [];
+
+let score = 0;
+let highScore = Number(localStorage.getItem("doubleTapHighScore")) || 0;
+
+let gameRunning = false;
+let gameStarted = false;
+
+let speed = 6;
+let baseSpeed = 6;
+let frame = 0;
+
+let groundOffset = 0;
+let obstacleTimer = 0;
+
+let lastTime = 0;
+let deltaTime = 1;
+
+/* PLAYER */
+
+function createPlayer() {
+    return {
+        x: 70,
+        y: ground - 45,
+        size: 36,
+        velocityY: 0,
+        jumps: 0,
+        maxJumps: 2,
+        rotation: 0,
+        color: colors[selectedColor],
+        onGround: true
+    };
+}
+
+/* START GAME */
+
+function startGame() {
+
+    player = createPlayer();
+
+    obstacles = [];
+    particles = [];
+
+    score = 0;
+    speed = baseSpeed;
+    frame = 0;
+    obstacleTimer = 0;
+    groundOffset = 0;
+
+    gameRunning = true;
+    gameStarted = true;
+
+    startScreen.classList.add("hidden");
+    gameOverScreen.classList.add("hidden");
+    hud.classList.remove("hidden");
+
+    scoreDisplay.textContent = "0";
+
+    lastTime = performance.now();
+
+    requestAnimationFrame(gameLoop);
+}
+
+/* JUMP */
+
+function jump() {
+
+    if (!gameRunning || !player) return;
+
+    if (player.jumps < player.maxJumps) {
+
+        player.velocityY = player.jumps === 0 ? -13.5 : -11.5;
+
+        player.jumps++;
+        player.onGround = false;
+
+        createParticles(
+            player.x + player.size / 2,
+            player.y + player.size,
+            player.color,
+            6
+        );
+    }
+}
+
+/* CONTROLS */
+
+document.addEventListener("pointerdown", (e) => {
+
+    if (
+        e.target.closest("button") ||
+        e.target.closest(".character")
+    ) return;
+
+    if (gameRunning) {
+        jump();
+    }
+
+});
+
+document.addEventListener("keydown", (e) => {
+
+    if (e.code === "Space" || e.code === "ArrowUp") {
+
+        e.preventDefault();
+
+        if (gameRunning) jump();
+
+        else if (!gameStarted) startGame();
+    }
+
+});
+
+/* OBSTACLES */
+
+function spawnObstacle() {
+
+    const obstacleWidth = 25 + Math.random() * 20;
+    const obstacleHeight = 30 + Math.random() * 40;
+
+    obstacles.push({
+        x: width + 50,
+        y: ground - obstacleHeight,
+        width: obstacleWidth,
+        height: obstacleHeight,
+        color: Math.random() > 0.5 ? "#64748b" : "#475569"
+    });
+
+}
+
+/* PARTICLES */
+
+function createParticles(x, y, color, amount) {
+
+    for (let i = 0; i < amount; i++) {
+
+        particles.push({
+            x,
+            y,
+            velocityX: (Math.random() - 0.5) * 5,
+            velocityY: (Math.random() - 1) * 5,
+            size: Math.random() * 5 + 2,
+            life: 1,
+            color
+        });
+
+    }
+
+}
+
+/* DRAW PLAYER */
+
+function drawPlayer() {
+
+    if (!player) return;
+
+    ctx.save();
+
+    ctx.translate(
+        player.x + player.size / 2,
+        player.y + player.size / 2
+    );
+
+    ctx.rotate(player.rotation);
+
+    const size = player.size;
+
+    /* Glow */
+
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = player.color;
+
+    /* Body */
+
+    ctx.fillStyle = player.color;
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        -size / 2,
+        -size / 2,
+        size,
+        size,
+        10
+    );
+
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+    /* Eyes */
+
+    ctx.fillStyle = "#080b14";
+
+    ctx.beginPath();
+    ctx.arc(-7, -5, 3, 0, Math.PI * 2);
+    ctx.arc(7, -5, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Smile */
+
+    ctx.beginPath();
+    ctx.arc(0, 4, 7, 0.1, Math.PI - 0.1);
+    ctx.strokeStyle = "#080b14";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+
+}
+
+/* DRAW OBSTACLES */
+
+function drawObstacles() {
+
+    obstacles.forEach(obstacle => {
+
+        ctx.fillStyle = obstacle.color;
+
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = obstacle.color;
+
+        ctx.beginPath();
+
+        ctx.roundRect(
+            obstacle.x,
+            obstacle.y,
+            obstacle.width,
+            obstacle.height,
+            6
+        );
+
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+
+        /* Highlight */
+
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+
+        ctx.fillRect(
+            obstacle.x + 4,
+            obstacle.y + 5,
+            4,
+            obstacle.height - 10
+        );
+
+    });
+
+}
+
+/* DRAW GROUND */
+
+function drawGround() {
+
+    ctx.fillStyle = "#1e293b";
+
+    ctx.fillRect(
+        0,
+        ground,
+        width,
+        height - ground
+    );
+
+    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(0, ground);
+    ctx.lineTo(width, ground);
+    ctx.stroke();
+
+    /* Moving lines */
+
+    ctx.fillStyle = "#475569";
+
+    for (let i = 0; i < width + 50; i += 50) {
+
+        ctx.fillRect(
+            (i - groundOffset) % width,
+            ground + 25,
+            20,
+            3
+        );
+
+    }
+
+}
+
+/* PARTICLES UPDATE */
+
+function updateParticles() {
+
+    particles.forEach(p => {
+
+        p.x += p.velocityX;
+        p.y += p.velocityY;
+
+        p.velocityY += 0.2;
+
+        p.life -= 0.025;
+
+        p.size *= 0.97;
+
+    });
+
+    particles = particles.filter(p => p.life > 0);
+
+}
+
+/* DRAW PARTICLES */
+
+function drawParticles() {
+
+    particles.forEach(p => {
+
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+
+    });
+
+    ctx.globalAlpha = 1;
+
+}
+
+/* GAME UPDATE */
+
+function update() {
+
+    if (!gameRunning) return;
+
+    frame++;
+
+    /* Gradually increase speed */
+
+    speed = Math.min(
+        15,
+        baseSpeed + score / 400
+    );
+
+    speedDisplay.textContent =
+        (speed / baseSpeed).toFixed(1) + "x";
+
+    /* Score */
+
+    score += deltaTime * 0.15;
+
+    scoreDisplay.textContent = Math.floor(score);
+
+    /* Ground */
+
+    groundOffset += speed * deltaTime;
+
+    /* Player gravity */
+
+    player.velocityY += 0.65 * deltaTime;
+
+    player.y += player.velocityY * deltaTime;
+
+    if (player.y + player.size >= ground) {
+
+        player.y = ground - player.size;
+
+        player.velocityY = 0;
+
+        player.jumps = 0;
+
+        player.onGround = true;
+
+    }
+
+    /* Rotation */
+
+    if (!player.onGround) {
+
+        player.rotation += 0.08 * deltaTime;
+
+    } else {
+
+        player.rotation = 0;
+
+    }
+
+    /* Spawn obstacles */
+
+    obstacleTimer += deltaTime;
+
+    let spawnInterval = Math.max(
+        65,
+        110 - speed * 3
+    );
+
+    if (obstacleTimer > spawnInterval) {
+
+        spawnObstacle();
+
+        obstacleTimer = 0;
+
+    }
+
+    /* Move obstacles */
+
+    obstacles.forEach(obstacle => {
+
+        obstacle.x -= speed * deltaTime;
+
+    });
+
+    obstacles = obstacles.filter(
+        obstacle => obstacle.x + obstacle.width > -50
+    );
+
+    /* Collision detection */
+
+    obstacles.forEach(obstacle => {
+
+        const padding = 5;
+
+        if (
+
+            player.x + player.size - padding > obstacle.x &&
+
+            player.x + padding < obstacle.x + obstacle.width &&
+
+            player.y + player.size - padding > obstacle.y &&
+
+            player.y + padding < obstacle.y + obstacle.height
+
+        ) {
+
+            endGame();
+
+        }
+
+    });
+
+    updateParticles();
+
+}
+
+/* GAME OVER */
+
+function endGame() {
+
+    if (!gameRunning) return;
+
+    gameRunning = false;
+
+    createParticles(
+        player.x + player.size / 2,
+        player.y + player.size / 2,
+        player.color,
+        25
+    );
+
+    const finalScore = Math.floor(score);
+
+    if (finalScore > highScore) {
+
+        highScore = finalScore;
+
+        localStorage.setItem(
+            "doubleTapHighScore",
+            highScore
+        );
+
+    }
+
+    document.getElementById("finalScore").textContent =
+        finalScore;
+
+    setTimeout(() => {
+
+        gameOverScreen.classList.remove("hidden");
+        hud.classList.add("hidden");
+
+    }, 500);
+
+}
+
+/* MAIN LOOP */
+
+function gameLoop(timestamp) {
+
+    if (!gameRunning) return;
+
+    deltaTime = Math.min(
+        (timestamp - lastTime) / 16.67,
+        2
+    );
+
+    lastTime = timestamp;
+
+    ctx.clearRect(0, 0, width, height);
+
+    update();
+
+    drawGround();
+    drawObstacles();
+    drawPlayer();
+    drawParticles();
+
+    requestAnimationFrame(gameLoop);
+
+}
+
+/* BUTTONS */
+
+document.getElementById("startBtn").addEventListener(
+    "click",
+    startGame
+);
+
+document.getElementById("restartBtn").addEventListener(
+    "click",
+    startGame
+);
+
+</script>
+
+</body>
+</html>
